@@ -1,0 +1,122 @@
+<script type='text/javascript'>
+
+      var mapCanvas, layer, infoWnd;
+      var ftTableId = "1fLFHL3QzEauLeuuN0aRAeuEVRNpMVC5y1Y-j8w";
+      
+      function init_map() {
+        /*
+         * (2)Initalize a map.
+         */
+        var mapDiv = document.getElementById("map_canvas");
+        mapCanvas = new google.maps.Map(mapDiv, {
+          mapTypeId : google.maps.MapTypeId.ROADMAP
+        });
+        
+        // (2) Create an info window instead of fusion tables layer's infowindow.
+        infoWnd = new google.maps.InfoWindow();
+        
+        // (3) Create a fusion tables layer.
+        layer = new google.maps.FusionTablesLayer({
+          query : {
+            select : "latitude",
+            from : ftTableId
+          },
+          map : mapCanvas,
+          
+          //Important!
+          suppressInfoWindows : true
+        });
+        
+        // (7)Open the info window when the layer is clicked.
+        google.maps.event.addListener(layer, "click", function(evt) {
+          openInfoWindow(evt);
+        });
+        
+        
+        /*
+         * (4)Load data from the fusion tables using google-javascript-apis-library.
+         * https://developers.google.com/fusiontables/
+         */
+        var request = gapi.client.fusiontables.query.sqlGet({
+          'sql': 'select * from ' + ftTableId
+        });
+        
+        /*
+         * (5)Parse the response, then create FusionTablesMouseEvents.
+         * https://developers.google.com/maps/documentation/javascript/3.exp/reference#FusionTablesMouseEvent
+         */
+        request.execute(function(response) {
+          var bounds = new google.maps.LatLngBounds();
+          var pixelOffset = new google.maps.Size(0, -16, "px", "px");
+          
+          var j, columnName, latLng;
+          for (var i in response.rows) {
+            var row = {};
+            for (j = 0; j < response.columns.length; j++) {
+              columnName = response.columns[j];
+              row[columnName] = {
+                "columnName" : columnName,
+                "value" : response.rows[i][j]
+              };
+            }
+            ftMouseEvt = {
+              row : row,
+              pixelOffset : pixelOffset,
+              latLng : new google.maps.LatLng(row.latitude.value, row.longtiude.value)
+            };
+            addListItem(ftMouseEvt);
+            
+            bounds.extend(ftMouseEvt.latLng);
+          }
+          
+          // Display the map
+          mapCanvas.fitBounds(bounds);
+        });
+      }
+      
+      /*
+       * (6)Create a list item, then add to the list div.
+       */
+      function addListItem(info) {
+        //Create a list item.
+        var btn = document.createElement("div");
+        btn.setAttribute("class", "listItem");
+        btn.innerHTML = info.row.station_en.value;
+        
+        //Append to the list div.
+        var list = document.getElementById("list");
+        list.appendChild(btn);
+        
+        //Open the info window when the item is clicked.
+        google.maps.event.addDomListener(btn, "click", function() {
+          openInfoWindow(info);
+        });
+      }
+      
+      /*
+       * Open the info window
+       */
+      function openInfoWindow(ftMouseEvt) {
+        var html = [];
+        html.push("<table class='ftTable'>");
+        for (var field in ftMouseEvt.row) {
+          html.push("<tr><th>" + field + "</th><td>" + ftMouseEvt.row[field].value + "</td></tr>");
+        }
+        html.push("</table>");
+        infoWnd.setOptions({
+          content : html.join(""),
+          position : ftMouseEvt.latLng,
+          pixelOffset : ftMouseEvt.pixelOffset
+        });
+        infoWnd.open(mapCanvas);
+      }
+      
+      
+      /*
+       * (1)Initialize the google-api-javascript-client library.
+       */
+      function init_api_client() {
+        gapi.client.setApiKey('AIzaSyDxSkKsMgiZTaiDTyswwiy5vQElYeOe_Ac');
+        gapi.client.load('fusiontables', 'v1', init_map);
+      }
+    </script>
